@@ -29,11 +29,52 @@ Repo de référence business : stratégie, sales, marketing, product, coûts, di
 
 **Le produit user-facing de Retriever.** Les utilisateurs s'authentifient, gèrent API keys / MCP tokens, lancent des recherches de companies (credit-based), sauvegardent des listes, consultent des profils entreprises.
 
+**URLs déployées :**
+- **Dashboard (front)** : https://app.retriever.run
+- **API (back)** : https://api.retriever.run (docs Swagger : `/docs`)
+- **Marketing (landing)** : https://retriever.run (→ pointe vers `retriever-marketing-website/`)
+
+**Structure :**
 - **`backend/`** : API Node.js/Fastify, Prisma + PostgreSQL, Stripe (billing credits), Sentry, Resend. 11 modules (auth, search, billing, lists, mcp, admin, usage, etc.). Entry point : `backend/src/app/server.ts`
 - **`frontend/`** : SPA React 19 + Vite + React Router v7 + React Query + Tailwind. Routes principales : `/`, `/searches`, `/lists`, `/company/:domain`, `/settings`, `/api`
 - **Endpoints clés :** `/v1/search?q=...` (recherche avec déduction de crédits), `/mcp` (serveur MCP HTTP pour Claude Code, tokens `mcp-...`)
 - **Billing :** Stripe Checkout, packs de crédits (1K/$9, 10K/$49, 100K/$199)
-- **État :** production-ready, déployé sur `api.retriever.run` (graceful shutdown, Sentry, logs Pino structurés, transactions sûres sur les crédits)
+
+**Lancer en local :**
+
+Prérequis : Node 20+ (pas de `engines` dans package.json mais la stack l'exige). Pas de Docker obligatoire : le backend peut utiliser PGlite embarqué. `npm` (pas de lockfile pnpm/yarn).
+
+```bash
+# ── Backend ──
+cd retriever-apps/backend
+cp .env.example .env
+# Éditer .env : JWT_ACCESS_SECRET et API_KEY_ENCRYPTION_SECRET (32 chars min),
+# SEARCH_API_URL + SEARCH_API_KEY (vers un moteur de recherche qui tourne).
+# Stripe/Resend/Sentry optionnels pour dev local.
+npm install
+npm run dev:local        # PGlite embarqué + migrations auto → écoute sur :3000
+
+# Alternative avec Postgres Docker :
+# docker compose up -d postgres   # expose 5433 (user/password, DB search_api)
+# npm run db:migrate && npm run dev
+
+# ── Frontend (dans un autre terminal) ──
+cd retriever-apps/frontend
+npm install
+VITE_API_BASE_URL=http://localhost:3000 npm run dev    # UI sur :5173
+```
+
+⚠️ **Gotcha port :** le backend écoute sur **3000** (via `.env`), mais le frontend tape **`localhost:3003`** par défaut quand on n'est pas sur `app.retriever.run`. D'où le `VITE_API_BASE_URL=http://localhost:3000` — sans ça, la UI charge mais chaque appel API échoue.
+
+**Ce qui marche / casse en minimal env :**
+- ✅ Search, lists, company lookup (si `SEARCH_API_URL` tourne)
+- ❌ Register / password reset (silencieux sans `RESEND_API_KEY`)
+- ❌ Billing / achat de crédits (sans clés Stripe)
+- ❌ Admin endpoints (requiert `ADMIN_SECRET` + JWT avec `isAdmin: true`)
+
+**Pas de seed :** créer un user via `POST /v1/auth/register` ou bootstrap admin manuellement.
+
+**État :** production-ready (graceful shutdown, Sentry, logs Pino structurés, transactions sûres sur les crédits).
 
 ---
 
