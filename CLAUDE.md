@@ -13,130 +13,215 @@ Workspace multi-repos qui regroupe les 4 repos de l'écosystème Retriever. Chaq
 | `retriever-marketing-website/` | `yonsy7/retriever-marketing-website` | **Site marketing** (landing Next.js) |
 | `Retriever-WEB-EXTRACTION/` | `yonsy7/Retriever-WEB-EXTRACTION` | **R&D + pipeline data** (extraction, scraping, expériences) |
 
----
-
-### `retriever-business/` — docs business
-
-Repo de référence business : stratégie, sales, marketing, product, coûts, discovery, compétition, to-do. Pas de code.
-
-- **Structure :** `docs/` avec sous-dossiers `sales/`, `marketing/`, `strategy/`, `product/`, `competition/`, `discovery/`, `couts/`, `to do/`
-- **Tooling Claude Code :** skills dédiés (`add-competitor`, `add-product-feature`, `update-crm`, `update-todo`, `discovery-call-notes`, `master-add-discovery-call`) + memory dans `memory/`
-- **Format :** compétiteurs et features maintenus en double (bloc narratif Markdown + ligne TSV pour tableaux)
-
----
-
-### `retriever-apps/` — le produit
-
-**Le produit user-facing de Retriever.** Les utilisateurs s'authentifient, gèrent API keys / MCP tokens, lancent des recherches de companies (credit-based), sauvegardent des listes, consultent des profils entreprises.
-
-**URLs déployées :**
-- **Dashboard (front)** : https://app.retriever.run
-- **API (back)** : https://api.retriever.run (docs Swagger : `/docs`)
-- **Marketing (landing)** : https://retriever.run (→ pointe vers `retriever-marketing-website/`)
-
-**Structure :**
-- **`backend/`** : API Node.js/Fastify, Prisma + PostgreSQL, Stripe (billing credits), Sentry, Resend. 11 modules (auth, search, billing, lists, mcp, admin, usage, etc.). Entry point : `backend/src/app/server.ts`
-- **`frontend/`** : SPA React 19 + Vite + React Router v7 + React Query + Tailwind. Routes principales : `/`, `/searches`, `/lists`, `/company/:domain`, `/settings`, `/api`
-- **Endpoints clés :** `/v1/search?q=...` (recherche avec déduction de crédits), `/mcp` (serveur MCP HTTP pour Claude Code, tokens `mcp-...`)
-- **Billing :** Stripe Checkout, packs de crédits (1K/$9, 10K/$49, 100K/$199)
-
-**Lancer en local :**
-
-Prérequis : Node 20+ (pas de `engines` dans package.json mais la stack l'exige). Pas de Docker obligatoire : le backend peut utiliser PGlite embarqué. `npm` (pas de lockfile pnpm/yarn).
-
-```bash
-# ── Backend ──
-cd retriever-apps/backend
-cp .env.example .env
-# Éditer .env : JWT_ACCESS_SECRET et API_KEY_ENCRYPTION_SECRET (32 chars min),
-# SEARCH_API_URL + SEARCH_API_KEY (vers un moteur de recherche qui tourne).
-# Stripe/Resend/Sentry optionnels pour dev local.
-npm install
-npm run dev:local        # PGlite embarqué + migrations auto → écoute sur :3000
-
-# Alternative avec Postgres Docker :
-# docker compose up -d postgres   # expose 5433 (user/password, DB search_api)
-# npm run db:migrate && npm run dev
-
-# ── Frontend (dans un autre terminal) ──
-cd retriever-apps/frontend
-npm install
-VITE_API_BASE_URL=http://localhost:3000 npm run dev    # UI sur :5173
-```
-
-⚠️ **Gotcha port :** le backend écoute sur **3000** (via `.env`), mais le frontend tape **`localhost:3003`** par défaut quand on n'est pas sur `app.retriever.run`. D'où le `VITE_API_BASE_URL=http://localhost:3000` — sans ça, la UI charge mais chaque appel API échoue.
-
-**Ce qui marche / casse en minimal env :**
-- ✅ Search, lists, company lookup (si `SEARCH_API_URL` tourne)
-- ❌ Register / password reset (silencieux sans `RESEND_API_KEY`)
-- ❌ Billing / achat de crédits (sans clés Stripe)
-- ❌ Admin endpoints (requiert `ADMIN_SECRET` + JWT avec `isAdmin: true`)
-
-**Pas de seed :** créer un user via `POST /v1/auth/register` ou bootstrap admin manuellement.
-
-**État :** production-ready (graceful shutdown, Sentry, logs Pino structurés, transactions sûres sur les crédits).
-
----
-
-### `retriever-marketing-website/` — landing
-
-Site marketing Next.js qui présente le produit.
-
-- **Stack :** Next.js 16.2.3 (App Router) + React 19 + TypeScript + Tailwind 3.4 + Vercel Analytics
-- **Entry points :** `app/page.tsx` (landing principale avec animations scroll, parallax hero, navbar shrinking), `app/layout.tsx`, `app/mcp/` (page produit MCP dédiée), `app/robots.ts` + `app/sitemap.ts`
-- **Assets :** `public/` (fonts, logos SVG)
-- **État :** v0.1.0, early-stage, pre-launch. Déploiement Vercel-ready
-- **Note :** des HTML de référence (`index.html`, `landing-page-inspiration.html`, `mcp.html`) et scripts de conversion (`convert.js/py`) — traces d'itérations design
-
----
-
-### `Retriever-WEB-EXTRACTION/` — R&D + pipelines
-
-**Repo fourre-tout pour tout ce qui est extraction web, scraping, expériences LLM, et pipelines data.** Plusieurs sous-projets indépendants cohabitent — pas un seul point d'entrée.
-
-**Sous-projets actifs :**
-- **`icp-matching-mvp/`** *(mature)* — Framework d'évaluation de schémas ICP. Le schéma canonique (`company-canonical-v1.schema.json`) est testé sur un benchmark retrieval (BM25 + vectoriel) pour valider quel schéma d'extraction maximise la précision de recherche B2B sémantique.
-- **`website-processing/`** *(mature)* — Pipeline Python de crawl + extraction LLM structurée vers JSON. Script principal : `extract-company.py`. Utilise un endpoint Codex custom pour les appels LLM.
-- **`MVP/`** *(WIP)* — Pipeline RAG local sur dataset d'entreprises françaises. Phases : sample PDL → Parquet/DuckDB → crawl (crawl4ai) → embeddings → filtering LLM → vector index → RAG eval. Inclut `experiments/` (Qwen via MLX sur Apple Silicon, LLM-as-judge à 85% accuracy, scraping LinkedIn). Entry : `MVP/data/sample/create_sample.py`. **Contient `.env` avec clé Cerebras — gitignoré localement.**
-- **`linkedin-automation/`** *(partiellement fonctionnel)* — Extension Chrome MV3. Like/comment/reply sur le feed marchent ; messaging et connection requests cassés (blocage React Fiber). Load via `extension/manifest.json`.
-- **`free-api/`** *(exploratoire)* — Clients Node.js pour tester des LLMs gratuits (Gemini, Grok, Kimi, ZAI, Perplexity) via Playwright/Puppeteer.
-
-**Autres :**
-- **`data/`** — `companies.france.parquet` (~103MB), dataset entreprises françaises pour analyses DuckDB
-- **`tech/proxies/`** — Listes de proxies Webshare (100 + 500). **Contient credentials** (user/pass).
-- **`scripts/`** — quasi vide
-- **`tmp-rayobrowse/` · `tmp-schema-assets/` · `tmp-steel-browser/`** — stubs vides, résidus d'expés abandonnées
-- **`1.md`, `plan.md`** — docs stratégiques (français) sur le pipeline ICP et la vision
-
-**Submodule :** `MVP/experiments/linkedin_scrapping/Andrew-Girgis-linkedin-company-scraper` → `Andrew-Girgis/linkedin-company-scraper` (pinné commit `a696cae`)
-
----
-
 ## Qui consomme qui ?
 
 - `retriever-apps/` = produit livré → c'est ce que voient les users/devs
-- `Retriever-WEB-EXTRACTION/` = laboratoire R&D → alimente la logique d'extraction utilisée (ou inspirée) par retriever-apps
+- `Retriever-WEB-EXTRACTION/` = laboratoire R&D → alimente la logique d'extraction de retriever-apps
 - `retriever-marketing-website/` = acquisition → amène les leads vers retriever-apps
 - `retriever-business/` = pilotage → docs stratégiques, sales, product qui informent les 3 autres
 
 ---
 
+## `retriever-business/` — docs business
+
+Repo de référence business : stratégie, sales, marketing, product, coûts, discovery, compétition, to-do. **Pas de code.**
+
+Tooling Claude Code : skills dédiés (`add-competitor`, `add-product-feature`, `update-crm`, `update-todo`, `discovery-call-notes`, `master-add-discovery-call`) — chaque skill demande validation avant modif.
+
+```
+retriever-business/
+├── docs/
+│   ├── sales/
+│   │   └── crm.tsv                          ← CRM prospects (TSV, 1 ligne/prospect)
+│   ├── strategy/
+│   │   ├── strategy.md                      ← vision, roadmap, décisions clés
+│   │   └── insights.md                      ← insights marché / utilisateurs
+│   ├── product/
+│   │   ├── product features.md              ← features (blocs narratifs)
+│   │   ├── product features.tsv             ← idem en tableau
+│   │   └── targeted queries.md              ← exemples de requêtes cibles
+│   ├── competition/
+│   │   ├── competitors.md                   ← fiches compétiteurs (narratif)
+│   │   ├── features-comparison.md           ← tableau comparatif Markdown
+│   │   ├── features-comparison.tsv          ← idem en TSV
+│   │   ├── exa_ai.md / gojiberry.md         ← fiches individuelles
+│   │   └── data sources.md
+│   ├── discovery/
+│   │   └── discovery_calls/                 ← un .md par call (date-nom-société)
+│   ├── marketing/
+│   │   └── linkedin/idees_post.md
+│   ├── couts/
+│   │   └── hypothese-couts.md
+│   └── to do/
+│       └── to do.md                         ← backlog P0/P1/P2 + semaine
+└── memory/
+    ├── MEMORY.md                            ← index mémoire Claude Code
+    └── *.md                                 ← fichiers mémoire individuels
+```
+
+---
+
+## `retriever-apps/` — le produit
+
+**Le produit user-facing.** Auth, API keys/MCP tokens, recherche de companies (credit-based), listes, profils entreprises, billing Stripe.
+
+**URLs :** dashboard → https://app.retriever.run · API → https://api.retriever.run · marketing → https://retriever.run
+
+```
+retriever-apps/
+├── backend/
+│   ├── .env.example                         ← LIRE EN PREMIER (vars requises)
+│   ├── truth-store/                         ← LIRE EN SECOND (brief, endpoints, data-model, flows)
+│   │   ├── brief.md                         ← vision produit + contraintes
+│   │   ├── endpoints.md                     ← tous les endpoints documentés
+│   │   ├── data-model.md                    ← schéma BDD expliqué
+│   │   ├── flows.md                         ← flux auth, billing, search
+│   │   ├── tech-stack.md
+│   │   └── use-cases.md
+│   ├── src/app/
+│   │   ├── server.ts                        ← entry point Fastify (port 3000)
+│   │   ├── config.ts                        ← validation env vars
+│   │   └── middleware/                      ← auth.middleware, api-key.middleware
+│   ├── src/features/
+│   │   ├── auth/                            ← register, login, refresh, reset password
+│   │   ├── search/                          ← /v1/search?q= (+ déduction crédits)
+│   │   ├── billing/                         ← Stripe checkout, plans, credits.service
+│   │   ├── lists/                           ← sauvegarder/gérer des listes de résultats
+│   │   ├── companies/                       ← lookup par domaine
+│   │   ├── mcp/                             ← serveur MCP HTTP (/mcp), tools search/lists/companies/usage
+│   │   ├── mcp-tokens/                      ← tokens mcp-... pour Claude Code
+│   │   ├── api-keys/                        ← gestion API keys
+│   │   ├── user/                            ← profil utilisateur
+│   │   ├── usage/                           ← suivi crédits consommés
+│   │   └── admin/                           ← panel admin (stats, gestion users)
+│   ├── src/shared/
+│   │   ├── db/prisma.ts                     ← client Prisma singleton
+│   │   ├── search-api/custom.provider.ts    ← appels au moteur de recherche externe
+│   │   ├── payment/stripe.provider.ts       ← Stripe
+│   │   └── email/resend.provider.ts         ← Resend
+│   ├── infra/prisma/schema.prisma           ← schéma BDD
+│   └── docker-compose.yml                   ← Postgres local (port 5433)
+└── frontend/
+    ├── src/config/env.js                    ← URLs API/app/marketing (+ fallback localhost:3003 ⚠️)
+    ├── src/router.jsx                       ← toutes les routes
+    ├── src/pages/                           ← SearchPage, ListsPage, CompanyPage, SettingsPage...
+    ├── src/api/                             ← clients API (auth, search, lists, companies, user...)
+    ├── src/hooks/                           ← React Query hooks (useSearch, useLists, useAuth...)
+    └── src/context/AuthContext.jsx
+```
+
+**Lancer en local :**
+```bash
+# Backend
+cd retriever-apps/backend
+cp .env.example .env   # éditer: JWT_ACCESS_SECRET, API_KEY_ENCRYPTION_SECRET (32 chars),
+                       # SEARCH_API_URL + SEARCH_API_KEY
+npm install
+npm run dev:local      # PGlite embarqué + migrations auto → :3000
+
+# Frontend (autre terminal)
+cd retriever-apps/frontend
+npm install
+VITE_API_BASE_URL=http://localhost:3000 npm run dev   # → :5173
+```
+
+⚠️ **Gotcha port :** sans `VITE_API_BASE_URL`, le frontend tape `localhost:3003` (pas 3000) → tous les appels API échouent.
+
+Ce qui marche/casse sans services optionnels : ✅ search + lists (si SEARCH_API_URL tourne) · ❌ register/reset pwd (sans Resend) · ❌ billing (sans Stripe) · ❌ admin (sans ADMIN_SECRET).
+
+---
+
+## `retriever-marketing-website/` — landing
+
+Site marketing Next.js qui présente le produit. Stack : Next.js 16.2.3 + React 19 + TypeScript + Tailwind 3.4 + Vercel Analytics. État : v0.1.0, pre-launch.
+
+```
+retriever-marketing-website/
+├── app/
+│   ├── page.tsx                             ← landing principale (scroll animations, parallax hero)
+│   ├── mcp/page.tsx                         ← page produit MCP dédiée
+│   ├── layout.tsx                           ← layout global + metadata SEO
+│   ├── globals.css                          ← styles globaux
+│   ├── robots.ts / sitemap.ts               ← SEO
+├── tailwind.config.ts                       ← theme, couleurs, fonts
+├── next.config.ts
+└── public/fonts/                            ← UrbaneRounded (tous les poids woff/woff2)
+```
+
+Note : `index.html`, `landing-page-inspiration.html`, `mcp.html` et `convert.js/py` — traces d'itérations design, pas dans le build Next.js.
+
+---
+
+## `Retriever-WEB-EXTRACTION/` — R&D + pipelines
+
+**Repo multi-projets.** Plusieurs sous-projets indépendants — pas de point d'entrée unique. Lire `plan.md` + `1.md` pour la vision globale.
+
+```
+Retriever-WEB-EXTRACTION/
+│
+├── icp-matching-mvp/                        ★ MATURE — framework eval schémas ICP
+│   ├── index.md                             ← vue d'ensemble (lire en premier)
+│   ├── criteria-v1.md                       ← critères ICP retenus
+│   ├── canonical-schema.md                  ← schéma extraction expliqué
+│   ├── company-canonical-v1.schema.json     ← schéma JSON (19KB)
+│   ├── company-types.md
+│   └── decisions/criteria-registry-v1.md
+│
+├── website-processing/                      ★ MATURE — pipeline crawl + extraction LLM
+│   ├── scripts/extract-company.py           ← script principal (crawl → JSON structuré)
+│   ├── scripts/generate-example-extractor-prompt.py
+│   ├── schemas/company-common-criteria-v1.schema.json
+│   ├── schemas/company-page-selection-v1.schema.json
+│   └── examples/                            ← exemples d'extraction (Clay, Payfit, Pigment...)
+│
+├── MVP/                                     ⚙ WIP — pipeline RAG local
+│   ├── data/sample/                         ← scripts pipeline (create_sample, crawl, embed, filter_llm...)
+│   │   └── .env (gitignored)                ← CEREBRAS_API_KEY
+│   ├── data/pdl-company/                    ← analyses dataset PDL 35M entreprises
+│   ├── data/linkedin-company-hugging-face/  ← analyses dataset LinkedIn 3.9M
+│   ├── experiments/semantic_filtering/llm_as_a_judge/  ← Qwen MLX, LLM-as-judge 85% accuracy
+│   ├── docs/tech/                           ← crawling.md, data-storage.md, llm-inference.md
+│   ├── planification/                       ← what-to-extract.md, llm-strategy.md
+│   └── PLAN-V0-Building.md
+│
+├── linkedin-automation/                     ⚠ PARTIEL — extension Chrome MV3
+│   ├── extension/manifest.json              ← charger en Chrome (dev mode)
+│   ├── extension/content.js                 ← injection page LinkedIn
+│   ├── extension/background.js
+│   ├── extension/popup.html / popup.js
+│   └── STATUS.md                            ← ce qui marche (feed ✅) / casse (messaging ❌)
+│
+├── free-api/                                ✦ EXPLORATOIRE — clients LLM gratuits
+│   ├── chat-gateway.mjs                     ← gateway multi-provider
+│   ├── gemini-* / grok-* / kimi-* / zai-* / perplexity-* / inception-*
+│   └── *-INVESTIGATION.md                   ← notes d'investigation par provider
+│
+├── data/
+│   └── companies.france.parquet             ← 103MB, gitignored (analyse DuckDB)
+├── tech/proxies/                            ← listes Webshare 100+500 (⚠️ credentials dedans)
+├── 1.md                                     ← doc pipeline benchmark ICP (FR, détaillé)
+├── plan.md                                  ← vision & 10 phases du moteur ICP
+└── .gitmodules                              ← submodule Andrew-Girgis/linkedin-company-scraper
+```
+
+**Submodule :** `MVP/experiments/linkedin_scrapping/Andrew-Girgis-linkedin-company-scraper` → pinné commit `a696cae`.
+
+---
+
 ## Règles de navigation
 
-- **Avant de modifier du code, toujours `cd` dans le bon sous-repo.** Les 4 repos sont indépendants : remotes différents, branches différentes, historiques séparés.
-- Ne jamais faire `git add .` depuis la racine en pensant commiter dans un sous-repo — les sous-repos sont gitignorés au niveau workspace.
-- Les `CLAUDE.md` locaux (dans chaque sous-repo) cascadent automatiquement quand on bosse depuis ce sous-repo.
+- **Avant de modifier du code, toujours `cd` dans le bon sous-repo.** Remotes différents, branches différentes, historiques séparés.
+- Ne jamais faire `git add .` depuis la racine — les sous-repos sont gitignorés au niveau workspace.
+- Les `CLAUDE.md` locaux cascadent automatiquement quand on bosse depuis un sous-repo.
 
 ## Workflow push
 
-| Où sont les modifs | Commande |
+| Modifs dans | Commande |
 | --- | --- |
-| Dans un sous-repo | `cd <sous-repo> && git push` → push vers le remote du sous-repo |
-| Workspace-level (ce CLAUDE.md, commandes, docs cross-repo) | `git push` depuis la racine → push vers le remote workspace |
-
-Le `.gitignore` à la racine exclut les 4 sous-repos, donc aucun risque de mélanger les commits.
+| Un sous-repo | `cd <sous-repo> && git push` |
+| Workspace (ce CLAUDE.md, commandes) | `git push` depuis la racine → `RetrieverGTM/retriever-workspace` |
 
 ## Points d'attention
 
-- **iCloud :** workspace stocké dans iCloud Drive. Si bizarreries sur `.git/`, vérifier qu'iCloud n'est pas en cours de sync. En cas de problèmes récurrents, envisager de déplacer vers `~/dev/`.
-- **Secrets exposés :** clé Cerebras (`.env` de MVP) et creds Webshare (proxies) sont dans l'historique de `retriever-business` et `Retriever-WEB-EXTRACTION`. À rotate côté fournisseur si tu veux être propre.
+- **iCloud :** workspace dans iCloud Drive. Si bizarreries `.git/`, attendre fin de sync.
+- **Secrets exposés :** clé Cerebras (MVP/.env) et creds Webshare (proxies) dans l'historique git. À rotate côté fournisseur.
