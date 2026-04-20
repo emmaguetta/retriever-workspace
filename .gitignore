@@ -1,0 +1,7 @@
+.DS_Store
+
+# Sous-repos indépendants (chacun a son propre remote)
+GTMbuilder/
+retriever-apps/
+retriever-marketing-website/
+Retriever-WEB-EXTRACTION/
