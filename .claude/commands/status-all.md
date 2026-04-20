@@ -3,7 +3,7 @@ description: Run git status across all 4 workspace repos and flag issues
 ---
 
 Run `git status --short` and `git log --oneline @{u}..HEAD 2>/dev/null` in each of these repos:
-- `GTMbuilder/`
+- `retriever-business/`
 - `retriever-apps/`
 - `retriever-marketing-website/`
 - `Retriever-WEB-EXTRACTION/`

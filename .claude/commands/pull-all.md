@@ -4,7 +4,7 @@ description: Pull latest from remote for all 4 workspace repos (workspace includ
 
 Pour chacun de ces repos, vérifier que le working tree est clean, puis faire `git pull --ff-only` :
 
-1. `GTMbuilder/`
+1. `retriever-business/`
 2. `retriever-apps/`
 3. `retriever-marketing-website/`
 4. `Retriever-WEB-EXTRACTION/`

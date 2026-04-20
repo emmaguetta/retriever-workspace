@@ -6,7 +6,7 @@ Depuis la CWD actuelle, déterminer dans quel repo on est :
 
 1. Lire le remote via `git remote get-url origin` (depuis la CWD).
 2. Afficher :
-   - Repo name (ex. `GTMbuilder`)
+   - Repo name (ex. `retriever-business`)
    - Remote URL
    - Branche actuelle
    - Chemin relatif par rapport à la racine du workspace (`/Claude for GTMBuilder/`)

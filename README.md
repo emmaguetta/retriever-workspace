@@ -6,7 +6,7 @@ Dossier de travail qui regroupe les 4 repos de l'écosystème Retriever pour bos
 
 ```
 Claude for GTMBuilder/
-├── GTMbuilder/                      → emmaguetta/retriever-business
+├── retriever-business/              → emmaguetta/retriever-business
 ├── retriever-apps/                  → yonsy7/retriever-apps
 ├── retriever-marketing-website/     → yonsy7/retriever-marketing-website
 └── Retriever-WEB-EXTRACTION/        → yonsy7/Retriever-WEB-EXTRACTION

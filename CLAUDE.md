@@ -8,7 +8,7 @@ Workspace multi-repos qui regroupe les 4 repos de l'écosystème Retriever. Chaq
 
 | Dossier | Remote | Stack | Rôle |
 | --- | --- | --- | --- |
-| `GTMbuilder/` | `emmaguetta/retriever-business` | Python (MLX, DuckDB, crawl4ai) | ICP search engine — pipeline data, extraction curseurs LLM, embeddings |
+| `retriever-business/` | `emmaguetta/retriever-business` | Python (MLX, DuckDB, crawl4ai) | ICP search engine — pipeline data, extraction curseurs LLM, embeddings |
 | `retriever-apps/` | `yonsy7/retriever-apps` | backend + frontend | Apps Retriever (produit) |
 | `retriever-marketing-website/` | `yonsy7/retriever-marketing-website` | Next.js + Tailwind | Site marketing / landing |
 | `Retriever-WEB-EXTRACTION/` | `yonsy7/Retriever-WEB-EXTRACTION` | Python (scraping) | Extraction web, scraping, pipeline data |
@@ -31,4 +31,4 @@ Le `.gitignore` à la racine exclut les 4 sous-repos, donc aucun risque de méla
 ## Points d'attention
 
 - **iCloud :** workspace stocké dans iCloud Drive. Si bizarreries sur `.git/`, vérifier qu'iCloud n'est pas en cours de sync. En cas de problèmes récurrents, envisager de déplacer vers `~/dev/`.
-- **CLAUDE.md de GTMbuilder** contient un working directory obsolète (`/Users/yoannaka/...`) — à corriger au passage quand on travaille dessus.
+- **CLAUDE.md de retriever-business** contient un working directory obsolète (`/Users/yoannaka/...`) — à corriger au passage quand on travaille dessus.
